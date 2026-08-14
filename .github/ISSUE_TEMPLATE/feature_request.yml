@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest something Atlas should do
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: >
+        Describe the situation rather than the solution — knowing the problem
+        usually leads somewhere better than the first idea for fixing it.
+      placeholder: I work across four microservices and want one collection that spans all of them.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What did you have in mind?
+      description: Optional — if you already have a shape in mind, describe it.
+
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you handle it today?
+      description: What tool or workaround are you using instead?

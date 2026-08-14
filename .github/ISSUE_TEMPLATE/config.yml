@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/softtunners/atlas.api/discussions
+    about: For anything that is not a bug or a specific request.
+  - name: Download Atlas
+    url: https://github.com/softtunners/atlas.api/releases/latest
+    about: Latest builds for macOS and Windows.

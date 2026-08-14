@@ -1,0 +1,41 @@
+name: Framework or language support
+description: Atlas did not recognise your backend
+labels: ["parser", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Atlas works out routes by reading code, so every framework needs its own
+        patterns. Tell us which one and show a route or two.
+
+  - type: input
+    id: framework
+    attributes:
+      label: Framework and version
+      placeholder: Hono 4, Actix Web 4, Micronaut 4…
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: TypeScript, Rust, Java…
+    validations:
+      required: true
+
+  - type: textarea
+    id: routes
+    attributes:
+      label: How a route is defined
+      description: Two or three real examples, including one with a request body.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: How request validation is declared
+      description: Zod, Pydantic, a decorator, a struct tag — whatever your stack uses.
+      render: text

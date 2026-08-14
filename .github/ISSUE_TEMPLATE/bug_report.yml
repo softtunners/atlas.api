@@ -1,0 +1,82 @@
+name: Bug report
+description: Something in Atlas does not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. The more specific this is, the faster it gets fixed.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, and what did Atlas do instead of what you expected?
+      placeholder: I opened a NestJS project and the routes under @Controller('admin') were missing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part
+      options:
+        - Scanning / Discovery — routes missed or wrong
+        - Build — collections, requests, folders
+        - Sending a request
+        - Flows
+        - Import (OpenAPI, Postman, cURL, RAML)
+        - Environments and variables
+        - Database browser
+        - Installing or launching the app
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: framework
+    attributes:
+      label: Backend framework
+      description: Only if this is a scanning problem.
+      placeholder: NestJS 10, Express 4, FastAPI…
+
+  - type: textarea
+    id: sample
+    attributes:
+      label: A sample of the code that was read wrongly
+      description: >
+        If a route was missed or parsed incorrectly, the route definition itself
+        is the single most useful thing you can paste. Remove anything sensitive.
+      render: typescript
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS — Apple silicon
+        - macOS — Intel
+        - Windows 11
+        - Windows 10
+        - Linux
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Atlas version
+      placeholder: "0.1.0"
+    validations:
+      required: true
