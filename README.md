@@ -4,123 +4,144 @@
 
 # Atlas
 
-**Point it at a backend folder. It reads the code and tells you every endpoint,
-what each one expects, and which ones nobody protected.**
+**A fast API client that runs in your browser. No account, no install,
+nothing stored on our servers.**
 
-[![Download](https://img.shields.io/badge/Download-macOS%20%7C%20Windows-059669?style=for-the-badge)](https://github.com/softtunners/atlas.api/releases/latest)
+[![npm](https://img.shields.io/npm/v/@atlas.api/agent?style=for-the-badge&color=059669&label=agent)](https://www.npmjs.com/package/@atlas.api/agent)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 
-[Download](https://atlas.api/download) · [Report a bug](https://github.com/softtunners/atlas.api/issues/new?template=bug_report.yml) · [Request a feature](https://github.com/softtunners/atlas.api/issues/new?template=feature_request.yml)
+[Open Atlas](https://atlas.api) · [Report a bug](https://github.com/softtunners/atlas.api/issues/new?template=bug_report.yml) · [Request a feature](https://github.com/softtunners/atlas.api/issues/new?template=feature_request.yml)
 
 </div>
 
 ---
 
-## What it is
+## The app
 
-Atlas reads your backend source and works out the API from the code itself —
-no OpenAPI spec, no annotations, no manual documentation.
+Atlas runs at **[atlas.api](https://atlas.api)** — import an OpenAPI or Postman
+file, or paste a `cURL` command, and start sending. Collections, environments,
+saved responses and chained requests, all kept in your browser.
 
-Open a folder and within about a second you have:
+Install it from the address bar and it opens in its own window and works
+offline.
 
-- **Every endpoint**, grouped by controller, with the method and full path
-- **Request shapes** pulled from Zod schemas, class-validator decorators or plain
-  `req.body` destructuring
-- **Response codes and messages** the handler can actually return
-- **Security findings** — routes with no auth, no rate limit, possible IDOR
-- **What each route touches** — services, database models, external APIs, env vars
-- **Call order**, as a graph: what you must call before this endpoint will work
-- **Dead routes** — endpoints shadowed by an earlier match that never run
+## This repository
 
-Then you can call any of it. Requests are pre-filled from the analysis, sent
-straight to your own backend, and saved responses become the documentation.
+Two things live here:
 
-## Two halves
+1. **`@atlas.api/agent`** — the small program below, which lets the web app
+   reach `localhost`.
+2. **Issues** — bugs and feature requests for Atlas as a whole.
 
-| | |
-|---|---|
-| **Discovery** | Derived from your code. Read-only, always current, tells you things you did not know. |
-| **Build** | Authored by you. Collections, folders, saved examples, environments — the Postman half. |
+---
 
-Anything Discovery finds can be sent to Build in one click, and **Flows** connects
-requests so one can hand a token or an id to the next.
+# @atlas.api/agent
+
+A page served over `https://` is not allowed to open a connection to
+`http://localhost`. Browsers block it on purpose: otherwise any site you
+visited could quietly scan the services running on your machine.
+
+That rule is worth keeping, so instead there is this — a small program you run
+yourself. Atlas asks it to make a request, it makes the call, it hands back the
+answer.
 
 ## Install
 
-Download for your platform from the [latest release](https://github.com/softtunners/atlas.api/releases/latest):
+Nothing to install permanently. Run it when you need it:
 
-| Platform | File |
+```bash
+npx github:softtunners/atlas.api
+```
+
+Once it is on npm:
+
+```bash
+npx @atlas.api/agent
+```
+
+Or keep it around:
+
+```bash
+npm install -g github:softtunners/atlas.api
+atlas-agent
+```
+
+Needs **Node 18 or newer**. That is the only requirement.
+
+## Use
+
+Start it:
+
+```bash
+$ npx github:softtunners/atlas.api
+
+  Atlas agent · 127.0.0.1:4400
+
+  Paste this into Atlas (Settings → Local agent):
+
+    ws://127.0.0.1:4400?token=8fJ2nQ...
+
+  Only this terminal has the token. Ctrl+C to stop.
+```
+
+Copy the `ws://` line into **Settings → Local agent** in Atlas. Requests to
+local addresses then go through it — `localhost` on any port, containers, and
+anything on your network or VPN. Public URLs carry on going out directly.
+
+Leave it running while you work. Ctrl+C when you are done.
+
+### Options
+
+```
+-p, --port <n>    Port to listen on            (default 4400)
+    --allow <re>  Additionally allow an origin (regex)
+-h, --help
+```
+
+## What it does not do
+
+- **It reads no files.** There is no filesystem access anywhere in it.
+- It stores nothing, and writes nothing to disk.
+- It talks to no host except the one in the request you asked for.
+
+## Security
+
+It is a program listening on a port, so that deserves a straight answer.
+
+Three checks, all of them, on every connection:
+
+1. **Binds `127.0.0.1` only** — never `0.0.0.0`, never a LAN address. Nothing
+   else on your network can see it.
+2. **Checks the calling page's `Origin`** against a short allowlist. Requests
+   from any other site are refused before anything is read.
+3. **Requires a token**, generated fresh on each run and printed only in your
+   terminal. Close the agent and it stops working.
+
+Cloud metadata endpoints (`169.254.*` and the Google and Azure equivalents) are
+refused outright — they hand out credentials to anything on the machine that
+asks, and running locally is no reason to be relaxed about that.
+
+### No dependencies
+
+Not "few" — zero. Every dependency this had would be one you were also trusting
+with a listening socket and outbound network access. The WebSocket layer is
+about 180 lines of RFC 6455 in [`lib/ws.mjs`](lib/ws.mjs), and the whole thing
+is under 25 KB unpacked.
+
+Read it before you run it. It is short on purpose.
+
+## Browser support
+
+| Browser | Works |
 |---|---|
-| macOS · Apple silicon | `Atlas-x.y.z-arm64.dmg` |
-| macOS · Intel | `Atlas-x.y.z.dmg` |
-| Windows | `Atlas-Setup-x.y.z.exe` |
-| Linux | `Atlas-x.y.z.AppImage` |
+| Chrome, Edge, Brave | Yes |
+| Firefox | No — refuses connections from `https://` to local addresses |
+| Safari | No — same |
 
-### The first launch shows a warning
-
-Atlas is not code-signed yet, so your OS flags it as coming from an unknown
-developer. This is expected.
-
-**macOS** — right-click Atlas in Applications → **Open** → **Open**. Once only.
-
-**Windows** — SmartScreen shows *"Windows protected your PC"* → **More info** →
-**Run anyway**.
-
-## Why it is a desktop app
-
-Atlas reads your filesystem, calls `http://localhost:3000` and starts your dev
-server. A website in a datacentre can do none of those things. Running on your
-machine means:
-
-- **Your source never leaves it.** There is no server to upload to.
-- **No CORS.** Requests go from your machine to your backend directly.
-- **No tunnel.** `localhost` means your localhost.
-
-Results are written into `.atlas.api/` inside the project you scanned, so they
-travel with the repo and show up in a diff. Environment values are gitignored
-automatically.
-
-## Supported frameworks
-
-Detected from the code, not from configuration:
-
-**Node** — Express · NestJS · Fastify · Koa
-**Python** — FastAPI · Django REST Framework · Flask
-**Other** — Go (Gin) · Java (Spring) · PHP (Laravel) · Ruby (Rails) · .NET
-
-Request schemas are read from Zod, class-validator, Pydantic and DRF
-serializers where present.
-
-## Also does
-
-- **Import** an OpenAPI or Swagger spec, a Postman collection, or a RAML file
-- **Paste a cURL command** and get a request back
-- **Export any JSON** — a whole response or just the part you selected — as a
-  TypeScript interface, Zod schema, JSON Schema, Dart class, Python dataclass or
-  Go struct
-- **Browse your database** — Postgres, MySQL, MongoDB
-- **Run your project** and watch its output without leaving the app
-
-## Issues and feedback
-
-This repository is for **bugs, feature requests and releases**.
-
-- 🐛 [Report a bug](https://github.com/softtunners/atlas.api/issues/new?template=bug_report.yml)
-- ✨ [Request a feature](https://github.com/softtunners/atlas.api/issues/new?template=feature_request.yml)
-- 💬 [Ask a question](https://github.com/softtunners/atlas.api/discussions)
-
-When reporting a scanning problem, the framework and a small example of the
-route that was missed helps enormously — the parser is the part most likely to
-be wrong on a codebase we have not seen.
-
-## Privacy
-
-Atlas has no analytics, no telemetry and no account requirement. It makes
-network requests to exactly two places: the API **you** ask it to call, and
-GitHub if you use the repository import. Nothing else leaves your machine.
+Nothing the agent does changes this; the restriction is in the browser.
 
 ---
 
-<div align="center">
-<sub>Built for people who inherited a backend nobody documented.</sub>
-</div>
+## Licence
+
+MIT. See [LICENSE](LICENSE).

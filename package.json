@@ -1,0 +1,22 @@
+{
+  "name": "@atlas.api/agent",
+  "version": "0.1.0",
+  "description": "Lets the Atlas web app send requests from your machine, so localhost is reachable.",
+  "type": "module",
+  "bin": {
+    "atlas-agent": "./index.mjs",
+    "atlas.api": "./index.mjs"
+  },
+  "main": "./index.mjs",
+  "files": ["index.mjs", "lib", "README.md", "LICENSE"],
+  "engines": { "node": ">=18" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/softtunners/atlas.api.git"
+  },
+  "homepage": "https://github.com/softtunners/atlas.api#readme",
+  "bugs": { "url": "https://github.com/softtunners/atlas.api/issues" },
+  "keywords": ["api", "http", "localhost", "proxy", "atlas", "rest-client"],
+  "license": "MIT",
+  "publishConfig": { "access": "public" }
+}
