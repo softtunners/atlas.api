@@ -32,10 +32,22 @@ import { scan, list } from "./lib/scan.mjs";
 
 const DEFAULT_PORT = 4400;
 
-/** Where the app may legitimately be served from. */
+/**
+ * Where the app may legitimately be served from.
+ *
+ * This is defence in depth rather than the lock. The token is the lock: 24
+ * random bytes printed only in this terminal, which no other page can guess.
+ * The origin check is here so that a page which somehow learned the token
+ * still has to be Atlas.
+ *
+ * Deployment previews get their own hostnames, so the Vercel pattern allows
+ * the project's previews as well as production. Anything else needs `--allow`.
+ */
 const ALLOWED_ORIGINS = [
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+  /^https:\/\/api-observer\.vercel\.app$/,
+  /^https:\/\/api-observer-[a-z0-9-]+\.vercel\.app$/,
   /^https:\/\/([a-z0-9-]+\.)*atlas\.api$/,
   /^https:\/\/([a-z0-9-]+\.)*atlasapi\.dev$/,
 ];
@@ -80,7 +92,8 @@ Options
   -h, --help        This
 
 It listens on 127.0.0.1 only, requires a token printed below, and checks the
-page's origin. It forwards requests and returns responses — it reads no files.
+page's origin. It reads the project folder you choose and forwards requests to
+local addresses. Your source is analysed here and never uploaded.
 `);
 }
 
@@ -134,7 +147,10 @@ function main() {
     const url = new URL(request.url ?? "/", "http://localhost");
 
     if (!allowed(origin)) {
-      console.log(`  ${dim("refused a connection from")} ${origin ?? "(no origin)"}`);
+      console.log(
+        `  ${dim("refused a connection from")} ${origin ?? "(no origin)"}\n` +
+          `  ${dim(`if that is your Atlas, restart with:  --allow '${(origin ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") || "https://your-host"}'`)}`,
+      );
       socket.destroy();
       return;
     }
