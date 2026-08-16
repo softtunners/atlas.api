@@ -1,3 +1,17 @@
+Atlas agent — licence
+=====================
+
+This package contains two kinds of thing, under two different licences.
+
+
+1. The agent source — MIT
+-------------------------
+
+`index.mjs`, `lib/ws.mjs`, `lib/proxy.mjs` and `lib/scan.mjs`.
+
+These are the parts you are invited to read before running something that
+listens on a port and reads your files. They are MIT:
+
 MIT License
 
 Copyright (c) 2026 Atlas
@@ -19,3 +33,24 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+2. The analyser — proprietary
+-----------------------------
+
+`lib/analyzer.min.mjs`.
+
+Copyright (c) 2026 Atlas. All rights reserved.
+
+This is a compiled build artifact, not source, and it is not MIT.
+
+You may use it as part of this package, for its purpose: analysing your own
+projects and sending the result to Atlas. You may install, run and redistribute
+it unmodified as part of this package.
+
+You may not decompile, reverse engineer, or otherwise attempt to derive its
+source, nor extract it for use in any other software, nor modify or create
+derivative works from it, except to the extent that any of these is expressly
+permitted by law regardless of this licence.
+
+No warranty is given for it, on the same terms as section 1.

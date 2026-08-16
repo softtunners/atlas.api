@@ -29,21 +29,30 @@ offline.
 
 Two things live here:
 
-1. **`@atlas.api/agent`** — the small program below, which lets the web app
-   reach `localhost`.
+1. **`@atlas.api/agent`** — the small program below. It reads your backend on
+   your own machine and sends Atlas the API map, and it lets the web app reach
+   `localhost`.
 2. **Issues** — bugs and feature requests for Atlas as a whole.
 
 ---
 
 # @atlas.api/agent
 
-A page served over `https://` is not allowed to open a connection to
-`http://localhost`. Browsers block it on purpose: otherwise any site you
-visited could quietly scan the services running on your machine.
+A browser tab cannot read a folder on your disk, and a page served over
+`https://` is not allowed to open a connection to `http://localhost`. Both
+rules are worth keeping — otherwise any site you visited could read your files
+and scan the services on your machine.
 
-That rule is worth keeping, so instead there is this — a small program you run
-yourself. Atlas asks it to make a request, it makes the call, it hands back the
-answer.
+So instead there is this: a small program you run yourself, which does both
+jobs on your side of the line.
+
+**It reads your project locally.** The analyser runs here, on your machine, in
+a process you started. Your source code is never uploaded — only the result
+(routes, request shapes, the database map) is sent to your browser tab. For
+anyone who cannot send proprietary code to a third party, this is the point.
+
+**It forwards requests.** Atlas asks it to make a call to a local address, it
+makes the call, it hands back the answer.
 
 ## Install
 
@@ -77,16 +86,20 @@ $ npx github:softtunners/atlas.api
 
   Atlas agent · 127.0.0.1:4400
 
-  Paste this into Atlas (Settings → Local agent):
+  Paste this into Atlas (it asks on the first local request):
 
     ws://127.0.0.1:4400?token=8fJ2nQ...
 
   Only this terminal has the token. Ctrl+C to stop.
 ```
 
-Copy the `ws://` line into **Settings → Local agent** in Atlas. Requests to
-local addresses then go through it — `localhost` on any port, containers, and
-anything on your network or VPN. Public URLs carry on going out directly.
+Send a request to a local address in Atlas and it asks for this line. Paste it
+in and the request carries on. You can also set it up ahead of time under
+**Settings → Local agent**.
+
+Requests to local addresses then go through it — `localhost` on any port,
+containers, and anything on your network or VPN. Public URLs carry on going out
+directly.
 
 Leave it running while you work. Ctrl+C when you are done.
 
@@ -98,11 +111,17 @@ Leave it running while you work. Ctrl+C when you are done.
 -h, --help
 ```
 
-## What it does not do
+## What it does and does not do
 
-- **It reads no files.** There is no filesystem access anywhere in it.
-- It stores nothing, and writes nothing to disk.
-- It talks to no host except the one in the request you asked for.
+It **does** read source files, but only under a folder you choose, and only
+when a connected Atlas tab asks it to. That is the feature.
+
+- It **uploads nothing.** Your code is read here and analysed here. What
+  crosses the socket is the API map, not your source.
+- It writes nothing to disk, and stores nothing between runs.
+- It talks to no host except the one in a request you asked for.
+- It refuses to scan `/`, system directories, and your home directory itself —
+  point it at a project.
 
 ## Security
 
@@ -121,14 +140,21 @@ Cloud metadata endpoints (`169.254.*` and the Google and Azure equivalents) are
 refused outright — they hand out credentials to anything on the machine that
 asks, and running locally is no reason to be relaxed about that.
 
-### No dependencies
+### One dependency
 
-Not "few" — zero. Every dependency this had would be one you were also trusting
-with a listening socket and outbound network access. The WebSocket layer is
-about 180 lines of RFC 6455 in [`lib/ws.mjs`](lib/ws.mjs), and the whole thing
-is under 25 KB unpacked.
+`typescript`, which the analyser uses to read your code properly rather than
+with regular expressions. Nothing else. The WebSocket layer is about 180 lines
+of RFC 6455 in [`lib/ws.mjs`](lib/ws.mjs), written by hand rather than pulled
+in, for exactly the reason you would expect of something holding a listening
+socket.
 
-Read it before you run it. It is short on purpose.
+`index.mjs`, `lib/ws.mjs`, `lib/proxy.mjs` and `lib/scan.mjs` are the parts
+that listen, read and forward. They are MIT and short on purpose — read them
+before you run this.
+
+`lib/analyzer.min.mjs` is a compiled build artifact and is not readable source.
+It is the product, and it is not MIT — see [LICENSE](LICENSE). Everything it is
+allowed to do is bounded by `lib/scan.mjs`, which you can read.
 
 ## Browser support
 
@@ -138,10 +164,12 @@ Read it before you run it. It is short on purpose.
 | Firefox | No — refuses connections from `https://` to local addresses |
 | Safari | No — same |
 
-Nothing the agent does changes this; the restriction is in the browser.
+Nothing the agent does changes this; the restriction is in the browser. It
+applies to scanning as well as to requests, since both use the same socket.
 
 ---
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+The agent source is MIT. The bundled analyser is proprietary. See
+[LICENSE](LICENSE) for both.

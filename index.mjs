@@ -28,6 +28,7 @@ import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
 import { accept } from "./lib/ws.mjs";
 import { proxy } from "./lib/proxy.mjs";
+import { scan, list } from "./lib/scan.mjs";
 
 const DEFAULT_PORT = 4400;
 
@@ -97,12 +98,30 @@ function main() {
     /* A tiny health endpoint so the app can find the agent before committing
        to a socket. It deliberately reveals nothing but "something is here". */
     if (request.url?.startsWith("/health")) {
-      response.writeHead(200, {
-        "content-type": "application/json",
-        "access-control-allow-origin": allowed(request.headers.origin)
-          ? (request.headers.origin ?? "*")
-          : "null",
-      });
+      const origin = allowed(request.headers.origin) ? request.headers.origin : null;
+
+      if (!origin) {
+        response.writeHead(403).end();
+        return;
+      }
+
+      const cors = {
+        "access-control-allow-origin": origin,
+        /* A page on the public internet reaching a local address is a request
+           into the private network, which browsers preflight separately from
+           ordinary CORS. Without this header the check is refused before the
+           handler ever runs. */
+        "access-control-allow-private-network": "true",
+        "access-control-allow-methods": "GET, OPTIONS",
+        "access-control-max-age": "600",
+      };
+
+      if (request.method === "OPTIONS") {
+        response.writeHead(204, cors).end();
+        return;
+      }
+
+      response.writeHead(200, { ...cors, "content-type": "application/json" });
       response.end(JSON.stringify({ ok: true, agent: "atlas", version: 1 }));
       return;
     }
@@ -143,6 +162,24 @@ function main() {
           return;
         }
 
+        if (message?.type === "scan") {
+          const target = message.payload?.path ?? "";
+          console.log(`  ${dim("scanning")} ${target}`);
+          const result = await scan(message.payload ?? {});
+          send({ id: message.id, type: "scan:result", result });
+          console.log(
+            result.ok
+              ? `  ${green("scanned")} ${result.project?.stats?.routes ?? 0} routes ${dim(`${result.durationMs}ms`)}`
+              : `  ${dim("scan failed —")} ${result.error}`,
+          );
+          return;
+        }
+
+        if (message?.type === "list") {
+          send({ id: message.id, type: "list:result", result: await list(message.payload ?? {}) });
+          return;
+        }
+
         if (message?.type === "ping") {
           send({ id: message.id, type: "pong" });
           return;
@@ -170,7 +207,7 @@ function main() {
     console.log(`
   ${bold("Atlas agent")} ${dim(`· 127.0.0.1:${args.port}`)}
 
-  Paste this into Atlas ${dim("(Settings → Local agent)")}:
+  Paste this into Atlas ${dim("(it asks on the first local request)")}:
 
     ${green(connect)}
 
