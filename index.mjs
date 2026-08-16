@@ -26,11 +26,33 @@
 
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { accept } from "./lib/ws.mjs";
 import { proxy } from "./lib/proxy.mjs";
 import { scan, list } from "./lib/scan.mjs";
+import {
+  banner,
+  connectBlock,
+  copyToClipboard,
+  keyHelp,
+  dim,
+  bold,
+  green,
+  red,
+  grey,
+  statusColour,
+  methodLabel,
+  shorten,
+  duration,
+} from "./lib/tui.mjs";
 
 const DEFAULT_PORT = 4400;
+
+/* Read rather than repeated, so `--version` and the banner cannot disagree
+   with what npm actually installed. */
+const VERSION = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+).version;
 
 /**
  * Where the app may legitimately be served from.
@@ -73,11 +95,6 @@ function parseArgs(argv) {
 const allowed = (origin) =>
   typeof origin === "string" && ALLOWED_ORIGINS.some((rule) => rule.test(origin));
 
-/* Colour only when a person is watching; piped output stays plain. */
-const tty = process.stdout.isTTY;
-const dim = (text) => (tty ? `[2m${text}[0m` : text);
-const bold = (text) => (tty ? `[1m${text}[0m` : text);
-const green = (text) => (tty ? `[32m${text}[0m` : text);
 
 function help() {
   console.log(`
@@ -104,8 +121,10 @@ function main() {
     return;
   }
 
-  const token = randomBytes(24).toString("base64url");
+  let token = randomBytes(24).toString("base64url");
   let connections = 0;
+
+  const connectUrl = () => `ws://127.0.0.1:${args.port}?token=${token}`;
 
   const server = createServer((request, response) => {
     /* A tiny health endpoint so the app can find the agent before committing
@@ -156,13 +175,15 @@ function main() {
     }
 
     if (url.searchParams.get("token") !== token) {
+      /* Also covers a token rotated with `r`: the old one stops working the
+         moment it is replaced, which is the point of offering it. */
       console.log(`  ${dim("refused a connection with a bad token")}`);
       socket.destroy();
       return;
     }
 
     connections += 1;
-    console.log(`  ${green("connected")} ${dim(origin ?? "unknown origin")}`);
+    console.log(`  ${green("●")} ${dim("connected")}  ${grey(origin ?? "unknown origin")}`);
 
     accept(request, socket, {
       onMessage: async (message, { send }) => {
@@ -173,21 +194,31 @@ function main() {
           send({ id: message.id, type: "proxy:result", result });
           const { method = "GET", url: target = "" } = message.payload ?? {};
           console.log(
-            `  ${dim("→")} ${method} ${target} ${dim(`${result.status} · ${result.durationMs ?? 0}ms`)}`,
+            `  ${methodLabel(method)} ${shorten(target).padEnd(58)} ` +
+              `${statusColour(result.status)} ${dim(duration(result.durationMs))}` +
+              /* A 502 here means the target refused us, not that the agent
+                 broke — worth saying, because it looks like our fault. */
+              (result.status === 0 || result.error
+                ? `  ${red("·")} ${dim(result.error ?? "no response")}`
+                : ""),
           );
           return;
         }
 
         if (message?.type === "scan") {
           const target = message.payload?.path ?? "";
-          console.log(`  ${dim("scanning")} ${target}`);
+          console.log(`\n  ${dim("scanning")} ${shorten(target, 62)}`);
           const result = await scan(message.payload ?? {});
           send({ id: message.id, type: "scan:result", result });
-          console.log(
-            result.ok
-              ? `  ${green("scanned")} ${result.project?.stats?.routes ?? 0} routes ${dim(`${result.durationMs}ms`)}`
-              : `  ${dim("scan failed —")} ${result.error}`,
-          );
+          if (result.ok) {
+            const stats = result.project?.stats ?? {};
+            console.log(
+              `  ${green("✓")} ${bold(String(stats.routes ?? 0))} routes ${dim("from")} ` +
+                `${stats.filesSeen ?? "?"} files ${dim(`· ${duration(result.durationMs)}`)}`,
+            );
+          } else {
+            console.log(`  ${red("✗")} ${result.error}`);
+          }
           return;
         }
 
@@ -205,7 +236,7 @@ function main() {
       },
       onClose: () => {
         connections -= 1;
-        console.log(`  ${dim("disconnected")}`);
+        console.log(`  ${grey("○")} ${dim("disconnected")}`);
       },
     });
   });
@@ -218,18 +249,66 @@ function main() {
     throw error;
   });
 
-  server.listen(args.port, "127.0.0.1", () => {
-    const connect = `ws://127.0.0.1:${args.port}?token=${token}`;
-    console.log(`
-  ${bold("Atlas agent")} ${dim(`· 127.0.0.1:${args.port}`)}
-
-  Paste this into Atlas ${dim("(it asks on the first local request)")}:
-
-    ${green(connect)}
-
-  ${dim("Only this terminal has the token. Ctrl+C to stop.")}
-`);
+  server.listen(args.port, "127.0.0.1", async () => {
+    banner(VERSION, args.port);
+    if (args.open) {
+      const copied = await copyToClipboard(connectUrl());
+      connectBlock(connectUrl(), copied);
+      console.log("");
+      keyHelp();
+    }
+    controls();
   });
+
+  /**
+   * Keys that do something while it runs.
+   *
+   * Raw mode, so `c` acts on the press rather than on Enter — this is a
+   * foreground process someone is glancing at, not a prompt. Skipped entirely
+   * when there is no TTY, where there is nobody to press anything and raw mode
+   * would throw.
+   */
+  function controls() {
+    if (!process.stdin.isTTY) return;
+
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding("utf8");
+
+    process.stdin.on("data", async (key) => {
+      /* Raw mode swallows Ctrl+C, so it has to be handled by hand. */
+      if (key === "\u0003" || key === "q") return stop();
+
+      if (key === "c") {
+        const copied = await copyToClipboard(connectUrl());
+        console.log(
+          copied
+            ? `  ${green("✓")} ${dim("url copied")}`
+            : `  ${dim(connectUrl())}`,
+        );
+        return;
+      }
+
+      if (key === "r") {
+        token = randomBytes(24).toString("base64url");
+        const copied = await copyToClipboard(connectUrl());
+        console.log(`\n  ${dim("new token — existing connections are now invalid")}\n`);
+        connectBlock(connectUrl(), copied);
+        console.log("");
+        return;
+      }
+
+      if (key === "s") {
+        console.log(
+          `  ${dim("status")}  ${connections > 0 ? green(`${connections} connected`) : grey("waiting")}` +
+            `  ${dim(`· 127.0.0.1:${args.port}`)}`,
+        );
+        return;
+      }
+
+      if (key === "?" || key === "h") keyHelp();
+    });
+  }
 
   const stop = () => {
     console.log(`\n  ${dim(`stopped${connections > 0 ? ` (${connections} open)` : ""}`)}`);
