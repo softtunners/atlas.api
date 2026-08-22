@@ -30,6 +30,7 @@ import { readFileSync } from "node:fs";
 import { accept } from "./lib/ws.mjs";
 import { proxy } from "./lib/proxy.mjs";
 import { scan, list } from "./lib/scan.mjs";
+import { gitInfo, gitList, gitCommit, gitPull, gitInit } from "./lib/git.mjs";
 import {
   banner,
   connectBlock,
@@ -202,6 +203,32 @@ function main() {
                 ? `  ${red("·")} ${dim(result.error ?? "no response")}`
                 : ""),
           );
+          return;
+        }
+
+        /* Git, using the credentials already on this machine. The workspace
+           never sees a token, and the repository is whichever one the chosen
+           project folder is already a clone of. */
+        if (message?.type?.startsWith?.("git.")) {
+          const op = message.type.slice(4);
+          const handler = { info: gitInfo, list: gitList, commit: gitCommit, pull: gitPull, init: gitInit }[op];
+
+          if (!handler) {
+            send({ id: message.id, type: "git:result", result: { ok: false, error: `Unknown git operation: ${op}` } });
+            return;
+          }
+
+          const result = await handler(message.payload ?? {});
+          send({ id: message.id, type: "git:result", result });
+
+          if (op === "commit") {
+            console.log(
+              result.ok
+                ? `  ${green("\u2713")} ${result.pushed ? "pushed" : result.committed ? "committed" : "no change"} ` +
+                    `${dim((result.files ?? []).join(", "))}`
+                : `  ${red("\u2717")} ${result.error}`,
+            );
+          }
           return;
         }
 
